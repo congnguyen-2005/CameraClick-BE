@@ -8,12 +8,12 @@ return [
 
     // SỬA DÒNG NÀY: Thay localhost bằng dấu '*' 
     // Dấu '*' nghĩa là cho phép mọi nguồn (bao gồm cả Vercel) truy cập
-'allowed_origins' => [
-    'https://camera-click-fe-3q2k-onrpjoc81-congnguyen-2005s-projects.vercel.app'
+'allowed_origins_patterns' => [
+    '#^https://camera-click-fe-.*\.vercel\.app$#'
 ],
 
-    'allowed_origins_patterns' => [],
 
+'allowed_origins' => [],
     'allowed_headers' => ['*'],
 
     'exposed_headers' => [],
