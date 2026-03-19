@@ -1,13 +1,22 @@
 <?php
 
 return [
-
+    // Cho phép tất cả các đường dẫn bắt đầu bằng api/
     'paths' => ['api/*', 'sanctum/csrf-cookie', 'login', 'register'],
-'allowed_methods' => ['*'],
-'allowed_origins' => ['http://localhost:3000','http://127.0.0.1:3000'], // Địa chỉ Next.js của bạn
-'allowed_origins_patterns' => [],
-'allowed_headers' => ['*'],
-'exposed_headers' => [],
-'max_age' => 0,
-'supports_credentials' => true,
+
+    'allowed_methods' => ['*'],
+
+    // SỬA DÒNG NÀY: Thay localhost bằng dấu '*' 
+    // Dấu '*' nghĩa là cho phép mọi nguồn (bao gồm cả Vercel) truy cập
+    'allowed_origins' => ['*'], 
+
+    'allowed_origins_patterns' => [],
+
+    'allowed_headers' => ['*'],
+
+    'exposed_headers' => [],
+
+    'max_age' => 0,
+
+    'supports_credentials' => true,
 ];
