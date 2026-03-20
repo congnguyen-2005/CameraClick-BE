@@ -53,12 +53,12 @@ class Product extends Model
     {
         return $this->belongsToMany(
             Attribute::class,
-            'product_attributes', // Đảm bảo tên bảng này khớp chính xác trong DB
+            'ntc_product_attributes', // Đảm bảo tên bảng này khớp chính xác trong DB
             'product_id',
             'attribute_id'
         )
-        ->withPivot('value') // QUAN TRỌNG: để lấy được dữ liệu Color/Size từ bảng trung gian
-        ->withTimestamps();   // Nếu bảng trung gian có created_at/updated_at
+        ->withPivot('value'); // QUAN TRỌNG: để lấy được dữ liệu Color/Size từ bảng trung gian
+      
     }
 
     /**
