@@ -153,7 +153,7 @@ class ProductController extends Controller
         $now = Carbon::now('Asia/Ho_Chi_Minh');
 
         // Sử dụng ID hoặc Slug linh hoạt
-        $product = Product::with(['category', 'images', 'attributes', 'product_store'])
+        $product = Product::with(['category', 'images', 'product_store'])
             ->where('id', $id)
             ->orWhere('slug', $id)
             ->first();
