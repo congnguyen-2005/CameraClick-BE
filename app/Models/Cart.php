@@ -10,7 +10,7 @@ class Cart extends Model
     use HasFactory;
 
     // Tên bảng (đảm bảo khớp với DB của bạn)
-    protected $table = 'carts'; 
+    protected $table = 'ntc_carts'; 
 
     protected $fillable = ['user_id', 'product_id', 'qty', 'options'];
 

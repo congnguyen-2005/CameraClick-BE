@@ -4,12 +4,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 
 class Attribute extends Model
-{protected $table = 'attributes';
+{protected $table = 'ntc_attributes';
     public $timestamps = false;
     protected $fillable = ['name'];
  public function products()
     {
-        return $this->belongsToMany(Product::class, 'product_attributes', 'attribute_id', 'product_id')
+        return $this->belongsToMany(Product::class, 'ntc_product_attributes', 'attribute_id', 'product_id')
                     ->withPivot('value');
     }
 }

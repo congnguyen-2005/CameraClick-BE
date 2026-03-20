@@ -5,7 +5,7 @@ use Illuminate\Database\Eloquent\Model;
 class Contact extends Model
 {
     // Thêm dòng này nếu tên bảng trong Database của bạn là 'contact'
-    protected $table = 'contacts'; 
+    protected $table = 'ntc_contacts'; 
 
     // Nếu bạn có cột created_at và updated_at, hãy để là true
     public $timestamps = true; 

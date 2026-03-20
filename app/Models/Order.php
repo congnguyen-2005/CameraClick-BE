@@ -5,7 +5,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Order extends Model
 {
-    protected $table = 'orders'; // Đảm bảo đúng tên bảng của bạn
+    protected $table = 'ntc_orders'; // Đảm bảo đúng tên bảng của bạn
     public $timestamps = false;
 
     protected $fillable = [
