@@ -17,43 +17,46 @@ class ProductController extends Controller
     // 📌 DANH SÁCH SẢN PHẨM (CÓ QUÉT GIÁ SALE)
     // =================================================
     public function index(Request $request)
-    {
-        $now = Carbon::now('Asia/Ho_Chi_Minh');
+{
+    $now = Carbon::now('Asia/Ho_Chi_Minh');
 
-        // Sử dụng Eloquent thay vì DB thuần để tận dụng Relation 'category'
-        $query = Product::query()
-            ->with(['category', 'product_store']) // Eager Loading category để Frontend dùng p.category.name
-            ->leftJoin('product_sales', function ($join) use ($now) {
-                $join->on('products.id', '=', 'product_sales.product_id')
-                    ->where('product_sales.status', 1)
-                    ->where('product_sales.date_begin', '<=', $now)
-                    ->where('product_sales.date_end', '>=', $now);
-            })
-            ->select(
-                'products.*',
-                'product_sales.price_sale',
-                'product_sales.name as sale_name',
-                'product_sales.date_end as sale_end'
-            );
+    // Lấy tên bảng thực tế từ Model để tránh viết sai tiền tố
+    $productTable = (new Product())->getTable(); // sẽ ra 'ntc_products'
+    $saleTable = (new ProductSale())->getTable(); // sẽ ra 'ntc_product_sales'
 
-        // Lọc theo từ khóa
-        if ($request->filled('search')) {
-            $query->where('products.name', 'like', '%' . $request->search . '%');
-        }
+    $query = Product::query()
+        ->with(['category', 'product_store']) 
+        ->leftJoin($saleTable, function ($join) use ($now, $productTable, $saleTable) {
+            $join->on("$productTable.id", '=', "$saleTable.product_id")
+                ->where("$saleTable.status", 1)
+                ->where("$saleTable.date_begin", '<=', $now)
+                ->where("$saleTable.date_end", '>=', $now);
+        })
+        ->select(
+            "$productTable.*",
+            "$saleTable.price_sale",
+            "$saleTable.name as sale_name",
+            "$saleTable.date_end as sale_end"
+        );
 
-        // Lọc theo danh mục
-        if ($request->filled('category_id')) {
-            $query->where('products.category_id', $request->category_id);
-        }
-
-        $products = $query->orderBy('products.id', 'asc')->get();
-
-        return response()->json([
-            'status' => true,
-            'message' => 'Lấy danh sách thành công',
-            'data' => $products // Lúc này mỗi product sẽ có thêm object "category" bên trong
-        ]);
+    // Lọc theo từ khóa
+    if ($request->filled('search')) {
+        $query->where("$productTable.name", 'like', '%' . $request->search . '%');
     }
+
+    // Lọc theo danh mục
+    if ($request->filled('category_id')) {
+        $query->where("$productTable.category_id", $request->category_id);
+    }
+
+    $products = $query->orderBy("$productTable.id", 'asc')->get();
+
+    return response()->json([
+        'status' => true,
+        'message' => 'Lấy danh sách thành công',
+        'data' => $products
+    ]);
+}
     // =================================================
     // 📌 LẤY TẤT CẢ SẢN PHẨM ĐANG SALE (TRANG SALE)
     // =================================================
