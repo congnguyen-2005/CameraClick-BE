@@ -150,33 +150,55 @@ class ProductController extends Controller
     // =================================================
     public function show($id)
     {
-        $now = Carbon::now('Asia/Ho_Chi_Minh');
+        try {
+            $now = Carbon::now('Asia/Ho_Chi_Minh');
 
-        // Sử dụng ID hoặc Slug linh hoạt
-        $product = Product::with(['category', 'images', 'product_store'])
-            ->where('id', $id)
-            ->orWhere('slug', $id)
-            ->first();
+            // Bước 1: Thử lấy sản phẩm cơ bản trước (không load quan hệ để test)
+            $product = Product::where('id', $id)
+                ->orWhere('slug', $id)
+                ->first();
 
-        if (!$product) {
-            return response()->json(['status' => false, 'message' => 'Không tìm thấy sản phẩm'], 404);
+            if (!$product) {
+                return response()->json(['status' => false, 'message' => 'Không tìm thấy sản phẩm này trong Database Railway'], 404);
+            }
+
+            // Bước 2: Thử load từng quan hệ một để xem cái nào làm sập Server
+            try {
+                $product->load(['category', 'product_store']);
+                // Nếu bạn có bảng ntc_product_images và ntc_product_attributes thì mới load dòng dưới
+                $product->load(['images', 'attributes']); 
+            } catch (\Exception $e_relation) {
+                return response()->json([
+                    'status' => false, 
+                    'message' => 'Lỗi ở phần Liên kết (Relationships): ' . $e_relation->getMessage()
+                ], 500);
+            }
+
+            // Bước 3: Quét tìm giá sale
+            $sale = ProductSale::where('product_id', $product->id)
+                ->where('status', 1)
+                ->where('date_begin', '<=', $now)
+                ->where('date_end', '>=', $now)
+                ->first();
+
+            $product->price_sale = $sale ? $sale->price_sale : null;
+            $product->sale_name = $sale ? $sale->name : null;
+
+            return response()->json([
+                'status' => true,
+                'data' => $product
+            ]);
+
+        } catch (\Throwable $e) {
+            // TRẢ VỀ LỖI CHI TIẾT ĐỂ CÔNG ĐỌC ĐƯỢC LUÔN
+            return response()->json([
+                'status' => false,
+                'error_type' => get_class($e),
+                'message' => 'Lỗi hệ thống: ' . $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ], 500);
         }
-
-        // Quét tìm giá sale đang diễn ra
-        $sale = ProductSale::where('product_id', $product->id)
-            ->where('status', 1)
-            ->where('date_begin', '<=', $now)
-            ->where('date_end', '>=', $now)
-            ->first();
-
-        // Gán trực tiếp vào object trả về
-        $product->price_sale = $sale ? $sale->price_sale : null;
-        $product->sale_name = $sale ? $sale->name : null;
-
-        return response()->json([
-            'status' => true,
-            'data' => $product
-        ]);
     }
 
     // =================================================
