@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Product extends Model
 {
-    protected $table = 'ntc_products'; // Bắt buộc phải có vì DB dùng tiền tố ntc_
+    protected $table = 'products'; // Bắt buộc phải có vì DB dùng tiền tố ntc_
     public $timestamps = true; 
 
     protected $fillable = [
