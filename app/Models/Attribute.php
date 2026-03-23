@@ -4,7 +4,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 
 class Attribute extends Model
-{protected $table = 'attributes';
+{protected $table = 'ntc_attributes';
     public $timestamps = false;
     protected $fillable = ['name'];
  public function products()

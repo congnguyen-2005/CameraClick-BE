@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class ProductStore extends Model
 {
-    protected $table = 'product_stores';
+    protected $table = 'ntc_product_stores';
 
     protected $fillable = [
     'product_id', 

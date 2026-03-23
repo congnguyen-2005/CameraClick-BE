@@ -4,7 +4,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Category extends Model
 {
-    protected $table = 'categories'; // Thêm dòng này
+    protected $table = 'ntc_categories'; // Thêm dòng này
     public $timestamps = false;
     protected $fillable = [
         'name','slug','image','parent_id','sort_order','description',
