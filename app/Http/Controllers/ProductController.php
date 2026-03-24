@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Http\Controllers;
-
+use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 use App\Models\Product;
 use App\Models\ProductStore;
 use App\Models\ProductSale;
@@ -101,52 +101,54 @@ class ProductController extends Controller
     // =================================================
     // 📌 THÊM SẢN PHẨM MỚI
     // =================================================
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'category_id' => 'required|exists:categories,id',
-            'name' => 'required|string|max:255',
-            'price_buy' => 'required|numeric|min:0',
-            'stock' => 'required|integer|min:0',
-            'thumbnail' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
-        ]);
+   public function store(Request $request)
+{
+    $validated = $request->validate([
+        'category_id' => 'required|exists:categories,id',
+        'name' => 'required|string|max:255',
+        'price_buy' => 'required|numeric|min:0',
+        'stock' => 'required|integer|min:0',
+        'thumbnail' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
+    ]);
 
-        try {
-            return DB::transaction(function () use ($request, $validated) {
-                // 1. Tạo Product
-                $product = new Product();
-                $product->name = $validated['name'];
-                $product->slug = Str::slug($validated['name']) . '-' . time();
-                $product->price_buy = $validated['price_buy'];
-                $product->category_id = $validated['category_id'];
-                $product->description = $request->description ?? '';
-                $product->content = $request->content ?? '';
-                $product->status = 1;
+    try {
+        return DB::transaction(function () use ($request, $validated) {
+            $product = new Product();
+            $product->name = $validated['name'];
+            $product->slug = Str::slug($validated['name']) . '-' . time();
+            $product->price_buy = $validated['price_buy'];
+            $product->category_id = $validated['category_id'];
+            $product->description = $request->description ?? '';
+            $product->content = $request->content ?? '';
+            $product->status = 1;
 
-                if ($request->hasFile('thumbnail')) {
-                    $path = $request->file('thumbnail')->store('uploads/products', 'public');
-                    $product->thumbnail = $path;
-                }
-
-                $product->save();
-
-                // 2. Tạo kho hàng khởi tạo
-                ProductStore::create([
-                    'product_id' => $product->id,
-                    'qty' => $validated['stock'],
-                    'price_root' => $validated['price_buy'],
+            // UPLOAD LÊN CLOUDINARY
+            if ($request->hasFile('thumbnail')) {
+                $result = Cloudinary::upload($request->file('thumbnail')->getRealPath(), [
+                    'folder' => 'cameraclick/products'
                 ]);
+                // Lấy link tuyệt đối lưu vào DB
+                $product->thumbnail = $result->getSecurePath(); 
+            }
 
-                return response()->json([
-                    'status' => true,
-                    'message' => 'Thêm sản phẩm thành công',
-                    'data' => $product
-                ], 201);
-            });
-        } catch (\Exception $e) {
-            return response()->json(['status' => false, 'message' => $e->getMessage()], 500);
-        }
+            $product->save();
+
+            ProductStore::create([
+                'product_id' => $product->id,
+                'qty' => $validated['stock'],
+                'price_root' => $validated['price_buy'],
+            ]);
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Thêm sản phẩm thành công (Lưu Cloudinary)',
+                'data' => $product
+            ], 201);
+        });
+    } catch (\Exception $e) {
+        return response()->json(['status' => false, 'message' => $e->getMessage()], 500);
     }
+}
 
     // =================================================
     // 📌 CHI TIẾT SẢN PHẨM (KÈM GIÁ SALE)
@@ -283,25 +285,18 @@ class ProductController extends Controller
     // =================================================
     // 📌 XÓA SẢN PHẨM
     // =================================================
-    public function destroy($id)
-    {
-        $product = Product::find($id);
-        if (!$product)
-            return response()->json(['status' => false, 'message' => 'Không tìm thấy'], 404);
+   public function destroy($id)
+{
+    $product = Product::find($id);
+    if (!$product) return response()->json(['status' => false, 'message' => 'Không tìm thấy'], 404);
 
-        if ($product->thumbnail) {
-            $oldPath = str_replace(url('storage/'), '', $product->thumbnail);
-            if (Storage::disk('public')->exists($oldPath)) {
-                Storage::disk('public')->delete($oldPath);
-            }
-        }
+    // Không cần xóa Storage local nữa vì mình dùng online
+    ProductStore::where('product_id', $id)->delete();
+    ProductSale::where('product_id', $id)->delete();
+    $product->delete();
 
-        ProductStore::where('product_id', $id)->delete();
-        ProductSale::where('product_id', $id)->delete();
-        $product->delete();
-
-        return response()->json(['status' => true, 'message' => 'Xóa sản phẩm thành công']);
-    }
+    return response()->json(['status' => true, 'message' => 'Xóa sản phẩm thành công']);
+}
 
     // =================================================
     // 📌 LẤY DATA TRANG HOME (Mới, Camera, Lens)
