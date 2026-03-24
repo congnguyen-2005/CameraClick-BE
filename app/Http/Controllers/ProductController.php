@@ -207,7 +207,7 @@ class ProductController extends Controller
     }
 
     // =================================================
-    public function update(Request $request, $id)
+   public function update(Request $request, $id)
     {
         $product = Product::find($id);
         if (!$product) {
@@ -216,22 +216,15 @@ class ProductController extends Controller
 
         try {
             return DB::transaction(function () use ($request, $product) {
-                // 1. Xử lý hình ảnh (Thumbnail)
+                // 1. Xử lý hình ảnh (Chuyển sang Cloudinary để không mất ảnh trên Railway)
                 if ($request->hasFile('thumbnail')) {
-                    // Xóa file cũ nếu tồn tại
-                    if ($product->thumbnail) {
-                        $oldPath = str_replace('storage/', '', $product->thumbnail);
-                        if (Storage::disk('public')->exists($oldPath)) {
-                            Storage::disk('public')->delete($oldPath);
-                        }
-                    }
-                    // Lưu file mới
-                    $path = $request->file('thumbnail')->store('uploads/products', 'public');
-                    $product->thumbnail = 'storage/' . $path;
+                    $result = Cloudinary::upload($request->file('thumbnail')->getRealPath(), [
+                        'folder' => 'cameraclick/products'
+                    ]);
+                    $product->thumbnail = $result->getSecurePath();
                 }
 
                 // 2. Cập nhật thông tin cơ bản
-                // Fill ngoại trừ các trường đặc biệt để xử lý riêng
                 $product->fill($request->except(['thumbnail', 'attributes', 'stock', '_method']));
 
                 if ($request->filled('name')) {
@@ -240,10 +233,10 @@ class ProductController extends Controller
 
                 $product->save();
 
-                // 3. Cập nhật kho hàng (Stock)
+                // 3. Cập nhật kho hàng
                 if ($request->has('stock')) {
                     ProductStore::updateOrCreate(
-                        ['product_id' => $product->id, 'type' => null],
+                        ['product_id' => $product->id],
                         [
                             'qty' => $request->stock,
                             'price_root' => $request->price_buy ?? ($product->price_buy ?? 0)
@@ -251,33 +244,42 @@ class ProductController extends Controller
                     );
                 }
 
-                // 4. Cập nhật thuộc tính (Attributes - Mối quan hệ n-n)
+                // 4. CẬP NHẬT THUỘC TÍNH (FIX LỖI OFFSET ON NULL)
                 if ($request->has('attributes')) {
                     $syncData = [];
-                    // Đảm bảo attributes được gửi lên là mảng
                     $attributes = $request->input('attributes', []);
+
+                    // Nếu Frontend gửi lên dạng String (do FormData), ta decode nó
                     if (is_string($attributes)) {
                         $attributes = json_decode($attributes, true);
                     }
 
-                    foreach ($attributes as $attr) {
-                        if (!empty($attr['attribute_id']) && isset($attr['value'])) {
-                            $syncData[$attr['attribute_id']] = ['value' => $attr['value']];
+                    // KIỂM TRA CHỐNG LỖI: Chỉ lặp nếu $attributes là mảng
+                    if (is_array($attributes)) {
+                        foreach ($attributes as $attr) {
+                            // CHỐNG LỖI NULL: Kiểm tra $attr có phải mảng và có key không
+                            if (is_array($attr) && !empty($attr['attribute_id']) && isset($attr['value'])) {
+                                $syncData[$attr['attribute_id']] = ['value' => $attr['value']];
+                            }
                         }
                     }
-                    $product->attributes()->sync($syncData);
+                    
+                    // Chỉ chạy sync khi có dữ liệu mảng hợp lệ
+                    if (!empty($syncData)) {
+                        $product->attributes()->sync($syncData);
+                    }
                 }
 
                 return response()->json([
                     'status' => true,
-                    'message' => 'Cập nhật sản phẩm thành công',
+                    'message' => 'Cập nhật thành công',
                     'data' => $product
                 ]);
             });
         } catch (\Exception $e) {
             return response()->json([
                 'status' => false,
-                'message' => 'Lỗi Server: ' . $e->getMessage()
+                'message' => 'Lỗi thực thi: ' . $e->getMessage()
             ], 500);
         }
     }
