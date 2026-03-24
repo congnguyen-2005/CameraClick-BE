@@ -1,21 +1,27 @@
 <?php
 
 return [
-    // Cho phép các đường dẫn cần thiết
-    'paths' => ['api/*', 'sanctum/csrf-cookie', 'login', 'register'],
+    /*
+    |--------------------------------------------------------------------------
+    | Cross-Origin Resource Sharing (CORS) Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Here you may configure your settings for cross-origin resource sharing
+    | or "CORS". This determines what cross-origin operations may execute
+    | in web browsers. You are free to adjust these settings as needed.
+    |
+    */
 
+    // Cho phép tất cả các đường dẫn trong api
+    'paths' => ['api/*', 'sanctum/csrf-cookie', 'login', 'register', 'logout'],
+
+    // Cho phép tất cả các phương thức (GET, POST, PUT, DELETE,...)
     'allowed_methods' => ['*'],
 
-    // BẮT BUỘC LIỆT KÊ CHÍNH XÁC TÊN MIỀN TẠI ĐÂY
-    'allowed_origins' => [
-        'https://cameraclick.online',
-        'https://www.cameraclick.online',
-        'http://localhost:3000', // Nếu bạn dùng Next.js local
-    ],
+    // MỞ CỬA HOÀN TOÀN: Cho phép tất cả các domain (Vercel link nào cũng chạy được)
+    'allowed_origins' => ['*'],
 
-    'allowed_origins_patterns' => [
-        '#^https://camera-click-fe-.*\.vercel\.app$#' // Cho link preview của Vercel
-    ],
+    'allowed_origins_patterns' => [],
 
     'allowed_headers' => ['*'],
 
@@ -23,5 +29,10 @@ return [
 
     'max_age' => 0,
 
-    'supports_credentials' => true, // Phải khớp với cấu hình Axios ở Frontend
+    /* 
+    | QUAN TRỌNG: Khi để allowed_origins là ['*'], 
+    | bạn PHẢI để supports_credentials là false.
+    | Vì bạn dùng Bearer Token trong Header nên để false vẫn chạy cực tốt.
+    */
+    'supports_credentials' => false,
 ];
