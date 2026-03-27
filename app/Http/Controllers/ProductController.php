@@ -9,7 +9,6 @@ use App\Models\ProductSale;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
 
 class ProductController extends Controller
@@ -89,7 +88,7 @@ class ProductController extends Controller
                 'status' => true,
                 'data' => $products
             ]);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return response()->json([
                 'status' => false,
                 'message' => $e->getMessage()
@@ -98,7 +97,7 @@ class ProductController extends Controller
     }
 
     // =================================================
-    // 📌 THÊM SẢN PHẨM MỚI
+    // 📌 THÊM SẢN PHẨM MỚI (ĐÃ BỌC BẢO VỆ CLOUDINARY)
     // =================================================
     public function store(Request $request)
     {
@@ -120,12 +119,19 @@ class ProductController extends Controller
                 $product->description = $request->description ?? '';
                 $product->content = $request->content ?? '';
                 $product->status = 1;
+                
+                $cloudinaryWarning = null;
 
+                // Cố gắng upload ảnh, nếu xịt thì lưu sản phẩm mà không có ảnh
                 if ($request->hasFile('thumbnail')) {
-                    $result = Cloudinary::upload($request->file('thumbnail')->getRealPath(), [
-                        'folder' => 'cameraclick/products'
-                    ]);
-                    $product->thumbnail = $result->getSecurePath(); 
+                    try {
+                        $result = Cloudinary::upload($request->file('thumbnail')->getRealPath(), [
+                            'folder' => 'cameraclick/products'
+                        ]);
+                        $product->thumbnail = $result->getSecurePath(); 
+                    } catch (\Throwable $th) {
+                        $cloudinaryWarning = "Sản phẩm đã được lưu nhưng up ảnh thất bại do lỗi cấu hình Cloudinary trên Railway.";
+                    }
                 }
 
                 $product->save();
@@ -136,7 +142,7 @@ class ProductController extends Controller
                     'price_root' => $validated['price_buy'] ?? 0,
                 ]);
 
-                // XỬ LÝ THUỘC TÍNH NẾU CÓ LÚC THÊM MỚI
+                // XỬ LÝ THUỘC TÍNH 
                 if ($request->has('attributes')) {
                     $syncData = [];
                     $attributes = $request->input('attributes', []);
@@ -157,12 +163,15 @@ class ProductController extends Controller
 
                 return response()->json([
                     'status' => true,
-                    'message' => 'Thêm sản phẩm thành công',
+                    'message' => $cloudinaryWarning ? $cloudinaryWarning : 'Thêm sản phẩm thành công',
                     'data' => $product
                 ], 201);
             });
-        } catch (\Exception $e) {
-            return response()->json(['status' => false, 'message' => 'Lỗi: ' . $e->getMessage()], 500);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'status' => false, 
+                'message' => 'Lỗi hệ thống: ' . $e->getMessage()
+            ], 500);
         }
     }
 
@@ -183,9 +192,8 @@ class ProductController extends Controller
             }
 
             try {
-                // Đảm bảo chỉ load những bảng đang tồn tại
                 $product->load(['category', 'product_store', 'attributes']); 
-            } catch (\Exception $e_relation) {
+            } catch (\Throwable $e_relation) {
                 return response()->json([
                     'status' => false, 
                     'message' => 'Lỗi quan hệ DB: ' . $e_relation->getMessage()
@@ -215,7 +223,7 @@ class ProductController extends Controller
     }
 
     // =================================================
-    // 📌 CẬP NHẬT SẢN PHẨM (ĐÃ VÁ LỖI ARRAY OFFSET ON NULL)
+    // 📌 CẬP NHẬT SẢN PHẨM
     // =================================================
     public function update(Request $request, $id)
     {
@@ -226,15 +234,18 @@ class ProductController extends Controller
 
         try {
             return DB::transaction(function () use ($request, $product) {
-                // 1. Xử lý hình ảnh Cloudinary
+                // Xử lý hình ảnh Cloudinary an toàn
                 if ($request->hasFile('thumbnail')) {
-                    $result = Cloudinary::upload($request->file('thumbnail')->getRealPath(), [
-                        'folder' => 'cameraclick/products'
-                    ]);
-                    $product->thumbnail = $result->getSecurePath();
+                    try {
+                        $result = Cloudinary::upload($request->file('thumbnail')->getRealPath(), [
+                            'folder' => 'cameraclick/products'
+                        ]);
+                        $product->thumbnail = $result->getSecurePath();
+                    } catch (\Throwable $th) {
+                        // Nếu lỗi thì bỏ qua, giữ lại ảnh cũ
+                    }
                 }
 
-                // 2. Cập nhật thông tin cơ bản
                 $product->fill($request->except(['thumbnail', 'attributes', 'stock', '_method']));
 
                 if ($request->filled('name')) {
@@ -243,7 +254,6 @@ class ProductController extends Controller
 
                 $product->save();
 
-                // 3. Cập nhật kho hàng
                 if ($request->has('stock')) {
                     ProductStore::updateOrCreate(
                         ['product_id' => $product->id],
@@ -254,27 +264,22 @@ class ProductController extends Controller
                     );
                 }
 
-                // 4. CẬP NHẬT THUỘC TÍNH (LỚP BẢO VỆ CHỐNG NULL CỰC MẠNH)
                 if ($request->has('attributes')) {
                     $syncData = [];
                     $attributes = $request->input('attributes', []);
 
-                    // Decode nếu là chuỗi JSON từ FormData gửi lên
                     if (is_string($attributes)) {
                         $attributes = json_decode($attributes, true);
                     }
 
-                    // BẢO VỆ 1: Phải là mảng mới cho chạy vòng lặp
                     if (is_array($attributes)) {
                         foreach ($attributes as $attr) {
-                            // BẢO VỆ 2: $attr bắt buộc phải là mảng và không được phép null
                             if (is_array($attr) && !empty($attr['attribute_id']) && isset($attr['value'])) {
                                 $syncData[$attr['attribute_id']] = ['value' => $attr['value']];
                             }
                         }
                     }
                     
-                    // Đồng bộ dữ liệu (Chạy ngay cả khi mảng rỗng để xóa các thuộc tính cũ nếu user bỏ hết)
                     $product->attributes()->sync($syncData);
                 }
 
@@ -284,7 +289,7 @@ class ProductController extends Controller
                     'data' => $product
                 ]);
             });
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return response()->json([
                 'status' => false,
                 'message' => 'Lỗi Server: ' . $e->getMessage()
@@ -302,7 +307,6 @@ class ProductController extends Controller
 
         ProductStore::where('product_id', $id)->delete();
         ProductSale::where('product_id', $id)->delete();
-        // Xóa luôn quan hệ attributes trong bảng pivot
         $product->attributes()->detach(); 
         $product->delete();
 
@@ -310,7 +314,7 @@ class ProductController extends Controller
     }
 
     // =================================================
-    // 📌 LẤY DATA TRANG HOME (Mới, Camera, Lens)
+    // 📌 LẤY DATA TRANG HOME 
     // =================================================
     public function getHomeData()
     {
@@ -326,7 +330,6 @@ class ProductController extends Controller
         ]);
     }
 
-    // Helper: Lấy sản phẩm theo danh mục có kèm giá Sale
     private function getProductByCategorySlug($slug, $limit)
     {
         $now = Carbon::now('Asia/Ho_Chi_Minh');
@@ -345,7 +348,6 @@ class ProductController extends Controller
             ->get();
     }
 
-    // Helper: Lấy sản phẩm mới nhất có kèm giá Sale
     private function getProductByCriteria($type, $limit)
     {
         $now = Carbon::now('Asia/Ho_Chi_Minh');
