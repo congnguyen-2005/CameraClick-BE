@@ -49,11 +49,12 @@ class CartController extends Controller
         }
     }
 
-    // THÊM VÀO GIỎ HÀNG (Sửa lỗi 500)
+    // THÊM VÀO GIỎ HÀNG (Sửa lỗi 500 và 422 ntc_products)
     public function store(Request $request)
     {
+        // FIX: Đổi 'exists:products,id' thành 'exists:ntc_products,id'
         $validator = Validator::make($request->all(), [
-            'product_id' => 'required|exists:products,id',
+            'product_id' => 'required|exists:ntc_products,id',
             'qty' => 'required|integer|min:1',
             'options' => 'nullable' 
         ]);
