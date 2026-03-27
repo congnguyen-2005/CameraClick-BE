@@ -97,7 +97,7 @@ class ProductController extends Controller
     }
 
     // =================================================
-    // 📌 THÊM SẢN PHẨM MỚI (ĐÃ BỌC BẢO VỆ CLOUDINARY)
+    // 📌 THÊM SẢN PHẨM MỚI (ĐÃ FIX LỖI 1364 SQL)
     // =================================================
     public function store(Request $request)
     {
@@ -120,9 +120,10 @@ class ProductController extends Controller
                 $product->content = $request->content ?? '';
                 $product->status = 1;
                 
+                // FIX LỖI 1364: Gán sẵn giá trị mặc định để MySQL không báo lỗi
+                $product->thumbnail = 'https://placehold.co/400x400?text=Chua+Co+Anh'; 
                 $cloudinaryWarning = null;
 
-                // Cố gắng upload ảnh, nếu xịt thì lưu sản phẩm mà không có ảnh
                 if ($request->hasFile('thumbnail')) {
                     try {
                         $result = Cloudinary::upload($request->file('thumbnail')->getRealPath(), [
@@ -130,7 +131,7 @@ class ProductController extends Controller
                         ]);
                         $product->thumbnail = $result->getSecurePath(); 
                     } catch (\Throwable $th) {
-                        $cloudinaryWarning = "Sản phẩm đã được lưu nhưng up ảnh thất bại do lỗi cấu hình Cloudinary trên Railway.";
+                        $cloudinaryWarning = "Sản phẩm đã được lưu nhưng up ảnh thất bại (Cloudinary chưa hoạt động).";
                     }
                 }
 
@@ -234,7 +235,6 @@ class ProductController extends Controller
 
         try {
             return DB::transaction(function () use ($request, $product) {
-                // Xử lý hình ảnh Cloudinary an toàn
                 if ($request->hasFile('thumbnail')) {
                     try {
                         $result = Cloudinary::upload($request->file('thumbnail')->getRealPath(), [
@@ -242,7 +242,7 @@ class ProductController extends Controller
                         ]);
                         $product->thumbnail = $result->getSecurePath();
                     } catch (\Throwable $th) {
-                        // Nếu lỗi thì bỏ qua, giữ lại ảnh cũ
+                        // Nếu upload lỗi, giữ nguyên ảnh cũ không làm sập server
                     }
                 }
 
