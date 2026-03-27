@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 use App\Models\Product;
 use App\Models\ProductStore;
 use App\Models\ProductSale;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
 
 class ProductController extends Controller
@@ -97,7 +97,7 @@ class ProductController extends Controller
     }
 
     // =================================================
-    // 📌 THÊM SẢN PHẨM MỚI (ĐÃ FIX LỖI 1364 SQL)
+    // 📌 THÊM SẢN PHẨM MỚI (LƯU LOCAL NHƯ BANNER)
     // =================================================
     public function store(Request $request)
     {
@@ -120,19 +120,12 @@ class ProductController extends Controller
                 $product->content = $request->content ?? '';
                 $product->status = 1;
                 
-                // FIX LỖI 1364: Gán sẵn giá trị mặc định để MySQL không báo lỗi
-                $product->thumbnail = 'https://placehold.co/400x400?text=Chua+Co+Anh'; 
-                $cloudinaryWarning = null;
-
+                // UPLOAD ẢNH LOCAL GIỐNG BANNER
                 if ($request->hasFile('thumbnail')) {
-                    try {
-                        $result = Cloudinary::upload($request->file('thumbnail')->getRealPath(), [
-                            'folder' => 'cameraclick/products'
-                        ]);
-                        $product->thumbnail = $result->getSecurePath(); 
-                    } catch (\Throwable $th) {
-                        $cloudinaryWarning = "Sản phẩm đã được lưu nhưng up ảnh thất bại (Cloudinary chưa hoạt động).";
-                    }
+                    $path = $request->file('thumbnail')->store('uploads/products', 'public');
+                    $product->thumbnail = 'storage/' . $path;
+                } else {
+                    $product->thumbnail = ''; // Tránh lỗi 1364 nếu người dùng không up ảnh
                 }
 
                 $product->save();
@@ -164,7 +157,7 @@ class ProductController extends Controller
 
                 return response()->json([
                     'status' => true,
-                    'message' => $cloudinaryWarning ? $cloudinaryWarning : 'Thêm sản phẩm thành công',
+                    'message' => 'Thêm sản phẩm thành công',
                     'data' => $product
                 ], 201);
             });
@@ -177,7 +170,7 @@ class ProductController extends Controller
     }
 
     // =================================================
-    // 📌 CHI TIẾT SẢN PHẨM (KÈM GIÁ SALE)
+    // 📌 CHI TIẾT SẢN PHẨM 
     // =================================================
     public function show($id)
     {
@@ -224,7 +217,7 @@ class ProductController extends Controller
     }
 
     // =================================================
-    // 📌 CẬP NHẬT SẢN PHẨM
+    // 📌 CẬP NHẬT SẢN PHẨM (LOCAL UPLOAD)
     // =================================================
     public function update(Request $request, $id)
     {
@@ -235,15 +228,19 @@ class ProductController extends Controller
 
         try {
             return DB::transaction(function () use ($request, $product) {
+                
+                // CẬP NHẬT ẢNH LOCAL
                 if ($request->hasFile('thumbnail')) {
-                    try {
-                        $result = Cloudinary::upload($request->file('thumbnail')->getRealPath(), [
-                            'folder' => 'cameraclick/products'
-                        ]);
-                        $product->thumbnail = $result->getSecurePath();
-                    } catch (\Throwable $th) {
-                        // Nếu upload lỗi, giữ nguyên ảnh cũ không làm sập server
+                    // Xóa ảnh cũ đi cho nhẹ server
+                    if ($product->thumbnail) {
+                        $oldPath = str_replace('storage/', '', $product->thumbnail);
+                        if (Storage::disk('public')->exists($oldPath)) {
+                            Storage::disk('public')->delete($oldPath);
+                        }
                     }
+                    // Lưu ảnh mới
+                    $path = $request->file('thumbnail')->store('uploads/products', 'public');
+                    $product->thumbnail = 'storage/' . $path;
                 }
 
                 $product->fill($request->except(['thumbnail', 'attributes', 'stock', '_method']));
@@ -304,6 +301,14 @@ class ProductController extends Controller
     {
         $product = Product::find($id);
         if (!$product) return response()->json(['status' => false, 'message' => 'Không tìm thấy'], 404);
+
+        // Xóa luôn file ảnh vật lý trên server khi xóa sản phẩm
+        if ($product->thumbnail) {
+            $oldPath = str_replace('storage/', '', $product->thumbnail);
+            if (Storage::disk('public')->exists($oldPath)) {
+                Storage::disk('public')->delete($oldPath);
+            }
+        }
 
         ProductStore::where('product_id', $id)->delete();
         ProductSale::where('product_id', $id)->delete();
