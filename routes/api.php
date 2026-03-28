@@ -2,6 +2,8 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+// use Illuminate\Support\Facades\Hash;
+// use App\Models\User;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CartController;
@@ -268,3 +270,16 @@ Route::middleware(['auth:sanctum', 'checkAdmin'])->group(function () {
     // Route hủy đơn hàng dành cho Admin
     Route::put('/admin/orders/{id}/cancel', [OrderController::class, 'cancelOrder']);
 });
+
+// Route::get('/create-admin-tc', function () {
+//     $admin = User::create([
+//         'name' => 'Admin CameraClick',
+//         'email' => 'admin@gmail.com',
+//         'username' => 'admin',
+//         'password' => Hash::make('admin123'),
+//         'phone' => '0123456789',
+//         'roles' => 'admin',
+//         'status' => 1,
+//     ]);
+//     return "Đã tạo xong Admin: " . $admin->email;
+// });
